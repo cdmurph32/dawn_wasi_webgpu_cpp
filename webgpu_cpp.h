@@ -1621,7 +1621,12 @@ struct StringViewAdapter {
     operator ::WGPUStringView() { return sv; }
     operator StringView() { return {sv.data, sv.length}; }
     operator const char*() {
-        assert(sv.length != WGPU_STRLEN);
+        // {NULL, WGPU_STRLEN} is the spec null sentinel (WGPU_STRING_VIEW_INIT). Treat as "".
+        if (sv.length == WGPU_STRLEN) {
+            nullTerminated = new char[1];
+            nullTerminated[0] = 0;
+            return nullTerminated;
+        }
         assert(nullTerminated == nullptr);
         nullTerminated = new char[sv.length + 1];
         for (size_t i = 0; i < sv.length; i++) {
@@ -1633,7 +1638,13 @@ struct StringViewAdapter {
 };
 }  // namespace detail
 
-inline StringView::StringView(const detail::StringViewAdapter& s): data(s.sv.data), length(s.sv.length) {}
+inline StringView::StringView(const detail::StringViewAdapter& s) {
+    // {NULL, WGPU_STRLEN} is the spec null sentinel (WGPU_STRING_VIEW_INIT).
+    // Normalize to empty string to avoid UB when std::string_view is constructed
+    // from {nullptr, SIZE_MAX} downstream.
+    if (s.sv.length == WGPU_STRLEN) { data = ""; length = 0; }
+    else { data = s.sv.data; length = s.sv.length; }
+}
 
 namespace detail {
 // For callbacks, we support two modes:
@@ -10005,6 +10016,13 @@ void Surface::WGPURelease(WGPUSurface handle) {
 }
 static_assert(sizeof(Surface) == sizeof(WGPUSurface), "sizeof mismatch for Surface");
 static_assert(alignof(Surface) == alignof(WGPUSurface), "alignof mismatch for Surface");
+
+// WASI has no surface concept — WGPUSurface is never a real object here.
+// These stubs satisfy the linker when Surface::WGPUAddRef/WGPURelease are linked.
+extern "C" {
+void wgpuSurfaceAddRef(WGPUSurface) {}
+void wgpuSurfaceRelease(WGPUSurface) {}
+}
 
 // TexelBufferView implementation
 
