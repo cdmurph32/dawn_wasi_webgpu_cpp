@@ -10018,10 +10018,10 @@ static_assert(sizeof(Surface) == sizeof(WGPUSurface), "sizeof mismatch for Surfa
 static_assert(alignof(Surface) == alignof(WGPUSurface), "alignof mismatch for Surface");
 
 // WASI has no surface concept — WGPUSurface is never a real object here.
-// These stubs satisfy the linker when Surface::WGPUAddRef/WGPURelease are linked.
+// inline satisfies the linker across TUs without duplicate-symbol errors.
 extern "C" {
-void wgpuSurfaceAddRef(WGPUSurface) {}
-void wgpuSurfaceRelease(WGPUSurface) {}
+inline void wgpuSurfaceAddRef(WGPUSurface) {}
+inline void wgpuSurfaceRelease(WGPUSurface) {}
 }
 
 // TexelBufferView implementation
